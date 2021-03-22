@@ -29,4 +29,12 @@ decided based on:
  - 20x WGS ~50GB fq.gz (x2)
  - hg38 with alt-contigs from Broad
 
+### example timings
 
+- map:     04:38
+- metrics: 00:12
+- dedup:   00:17
+- recal:   01:38
+- call:    01:41
+
+total ~8hrs

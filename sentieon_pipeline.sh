@@ -12,19 +12,6 @@
 #  - hg38 with alt-contigs from Broad
 # ******************************************
 
-# example:
-# ---------
-#
-ref_dir=/n/scratch3/users/a/ap491/F20FTSUSAT1396_HUMooaR/Reads/hg38
-senteion_dir=/n/scratch3/users/a/ap491/F20FTSUSAT1396_HUMooaR/Reads/sentieon
-license=$senteion_dir/Harvard_Medical_School_DBMI_eval.lic
-installed=$senteion_dir/sentieon-genomics-202010.01
-out_dir=/n/scratch3/users/a/ap491/F20FTSUSAT1396_HUMooaR/Reads/Clean/11530251
-fq1=PID11530251_1.fq.gz
-fq2=PID11530251_2.fq.gz
-
-runAsPipeline "sentieon_pipeline.sh -r $ref_dir -1 $out_dir/$fq1 -2 $out_dir/$fq2 -o $out_dir -l $license -i $installed" "sbatch -p short -t 10:0 -n 1" useTmp run
-
 
 while getopts r:1:2:o:l:i: flag
 do
@@ -49,11 +36,8 @@ echo "install_dir: $install_dir";
 # Update with the location of the reference data files
 fasta=$ref_dir/Homo_sapiens_assembly38.fasta
 known_1000G_indels=$ref_dir/Homo_sapiens_assembly38.known_indels.vcf.gz 
-
-# I haven't used these before so not used currently but look into it
-
-# dbsnp=$data_dir/reference/dbsnp_135.hg19_chr22.vcf
-# known_Mills_indels=$data_dir/reference/Mills_and_1000G_gold_standard.indels.hg19_chr22.sites.vcf
+dbsnp=$ref_dir/Homo_sapiens_assembly38.dbsnp138.vcf
+known_Mills_indels=$ref_dir/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
 
 # Set SENTIEON_LICENSE if it is not set in the environment
 # export SENTIEON_LICENSE=10.1.1.1:8990
@@ -136,16 +120,10 @@ $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo Dedup --rm
 # Perform recalibration (line 1)
 # Perform post-calibration check (lines 2,3,4 - optional)
 #@4,3,recal,,sbatch -p short -c 8 -n 1 -t 0-02:00 --mem 4G
-$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam --algo QualCal -k $known_1000G_indels recal_data.table && \
-$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo QualCal -k $known_1000G_indels recal_data.table.post && \
+$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table && \
+$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table.post && \
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv && \
 $SENTIEON_INSTALL_DIR/bin/sentieon plot QualCal -o recal_plots.pdf recal.csv
-
-# if use known_Mills_indels and dbsnp
-# $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table && \
-# $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table.post && \
-# $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv && \
-# $SENTIEON_INSTALL_DIR/bin/sentieon plot QualCal -o recal_plots.pdf recal.csv
 
 # ******************************************
 # 5b. ReadWriter to output recalibrated bam
@@ -167,10 +145,7 @@ $SENTIEON_INSTALL_DIR/bin/sentieon plot QualCal -o recal_plots.pdf recal.csv
 
 # Matching GATK 3.7, 3.8, 4.0
 #@5,4,call,,sbatch -p short -c 8 -n 1 -t 0-04:00 --mem 4G
-$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo Haplotyper --emit_conf=10 --call_conf=10 output-hc.vcf.gz
-
-# if use known_Mills_indels and dbsnp
-# $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo Haplotyper -d $dbsnp --emit_conf=10 --call_conf=10 output-hc.vcf.gz
+$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo Haplotyper -d $dbsnp --emit_conf=10 --call_conf=10 output-hc.vcf.gz
 
 # Matching GATK 4.1
 #$SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo Haplotyper -d $dbsnp --genotype_model multinomial --emit_conf 30 --call_conf 30 output-hc.vcf.gz

@@ -37,4 +37,4 @@ decided based on:
 - recal:   01:38
 - call:    01:41
 
-total ~8hrs
+total ~8hrs for 20x WGS

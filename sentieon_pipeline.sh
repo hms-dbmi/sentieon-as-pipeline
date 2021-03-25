@@ -13,7 +13,7 @@
 # ******************************************
 
 
-while getopts r:1:2:o:l:i: flag
+while getopts r:1:2:o:l:i:s:g: flag
 do
     case "${flag}" in
         r) ref_dir=${OPTARG};;
@@ -22,8 +22,12 @@ do
         o) data_dir=${OPTARG};;
         l) license=${OPTARG};;
         i) install_dir=${OPTARG};;
+        s) sample=${OPTARG};;
+        g) group=${OPTARG};;
     esac
 done
+
+platform="ILLUMINA" 
 
 echo "ref_dir: $ref_dir";
 echo "fastq_1: $fastq_1";
@@ -31,6 +35,9 @@ echo "fastq_2: $fastq_2";
 echo "data_dir: $data_dir";
 echo "license: $license";
 echo "install_dir: $install_dir";
+echo "sample: $sample";
+echo "group: $group";
+echo "platform: $platform";
 
 
 # Update with the location of the reference data files
@@ -48,15 +55,11 @@ export SENTIEON_LICENSE=$license
 # on O2: this path to change to Sentieon bin directory
 SENTIEON_INSTALL_DIR=$install_dir
 
-
 # Update with the location of temporary fast storage and uncomment
 #SENTIEON_TMPDIR=/tmp
 
 # It is important to assign meaningful names in actual cases.
 # It is particularly important to assign different read group names.
-sample="PID103174"
-group="PID103174"
-platform="ILLUMINA" 
 
 # Other settings
 nt=16 #number of threads to use in computation
@@ -80,14 +83,14 @@ bam_option="--bam_compression 1"
 export LD_PRELOAD=$SENTIEON_INSTALL_DIR/lib/libjemalloc.so
 export MALLOC_CONF=lg_dirty_mult:-1
 
-#@1,0,map,,sbatch -p short -c 16 -n 1 -t 0-08:00 --mem 30G
+#@1,0,map,,sbatch -p short -c 8 -n 1 -t 0-11:00 --mem 30G
 ( $SENTIEON_INSTALL_DIR/bin/sentieon bwa mem -M -R "@RG\tID:$group\tSM:$sample\tPL:$platform" -t $nt -K 10000000 $fasta $fastq_1 $fastq_2 || echo -n 'error' ) | $SENTIEON_INSTALL_DIR/bin/sentieon util sort $bam_option -r $fasta -o sorted.bam -t $nt --sam2bam -i -
 
 # ******************************************
 # 2. Metrics
 # ******************************************
 
-#@2,1,metrics,,sbatch -p short -c 8 -n 1 -t 0-01:00 --mem 4G
+#@2,1,metrics,,sbatch -p short -c 4 -n 1 -t 0-02:00 --mem 4G
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i sorted.bam --algo MeanQualityByCycle mq_metrics.txt --algo QualDistribution qd_metrics.txt --algo GCBias --summary gc_summary.txt gc_metrics.txt --algo AlignmentStat --adapter_seq '' aln_metrics.txt --algo InsertSizeMetricAlgo is_metrics.txt && \
 $SENTIEON_INSTALL_DIR/bin/sentieon plot GCBias -o gc-report.pdf gc_metrics.txt && \
 $SENTIEON_INSTALL_DIR/bin/sentieon plot QualDistribution -o qd-report.pdf qd_metrics.txt && \
@@ -98,7 +101,7 @@ $SENTIEON_INSTALL_DIR/bin/sentieon plot InsertSizeMetricAlgo -o is-report.pdf is
 # 3. Remove Duplicate Reads
 # To mark duplicate reads only without removing them, remove "--rmdup" in the second command
 # ******************************************
-#@3,2,dedup,,sbatch -p short -c 8 -n 1 -t 0-01:00 --mem 4G
+#@3,2,dedup,,sbatch -p short -c 4 -n 1 -t 0-02:00 --mem 4G
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo LocusCollector --fun score_info score.txt && \
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt $bam_option deduped.bam 
 
@@ -119,7 +122,7 @@ $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo Dedup --rm
 
 # Perform recalibration (line 1)
 # Perform post-calibration check (lines 2,3,4 - optional)
-#@4,3,recal,,sbatch -p short -c 8 -n 1 -t 0-02:00 --mem 4G
+#@4,3,recal,,sbatch -p short -c 4 -n 1 -t 0-04:00 --mem 4G
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table && \
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo QualCal -k $dbsnp -k $known_Mills_indels -k $known_1000G_indels recal_data.table.post && \
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt --algo QualCal --plot --before recal_data.table --after recal_data.table.post recal.csv && \
@@ -144,7 +147,7 @@ $SENTIEON_INSTALL_DIR/bin/sentieon plot QualCal -o recal_plots.pdf recal.csv
 # ******************************************
 
 # Matching GATK 3.7, 3.8, 4.0
-#@5,4,call,,sbatch -p short -c 8 -n 1 -t 0-04:00 --mem 4G
+#@5,4,call,,sbatch -p short -c 4 -n 1 -t 0-08:00 --mem 4G
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -r $fasta -t $nt -i deduped.bam -q recal_data.table --algo Haplotyper -d $dbsnp --emit_conf=10 --call_conf=10 output-hc.vcf.gz
 
 # Matching GATK 4.1

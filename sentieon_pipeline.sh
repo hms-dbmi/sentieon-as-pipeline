@@ -101,7 +101,7 @@ $SENTIEON_INSTALL_DIR/bin/sentieon plot InsertSizeMetricAlgo -o is-report.pdf is
 # 3. Remove Duplicate Reads
 # To mark duplicate reads only without removing them, remove "--rmdup" in the second command
 # ******************************************
-#@3,2,dedup,,sbatch -p short -c 6 -n 1 -t 0-04:00 --mem 4G
+#@3,2,dedup,,sbatch -p short -c 6 -n 1 -t 0-04:00 --mem 8G
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo LocusCollector --fun score_info score.txt && \
 $SENTIEON_INSTALL_DIR/bin/sentieon driver -t $nt -i sorted.bam --algo Dedup --rmdup --score_info score.txt --metrics dedup_metrics.txt $bam_option deduped.bam 
 
